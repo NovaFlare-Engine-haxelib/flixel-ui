@@ -278,31 +278,31 @@ class FlxInputText extends FlxText
 	{
 		regenGraphic();
 		checkEmptyFrame();
-		
+
 		if (alpha == 0 || _frame.type == EMPTY)
 			return;
-		
+
 		if (dirty) // rarely
 			calcFrame(useFramePixels);
-		
+
 		drawSprite(fieldBorderSprite);
 		drawSprite(backgroundSprite);
-		
+
 		for (camera in getCamerasLegacy())
 		{
 			if (!camera.visible || !camera.exists || !isOnScreen(camera))
 				continue;
-			
+
 			if (isSimpleRender(camera))
 				drawSimple(camera);
 			else
 				drawComplex(camera);
-			
+
 			#if FLX_DEBUG
 			FlxBasic.visibleCount++;
 			#end
 		}
-		
+
 		// In case caretColor was changed
 		if (caretColor != caret.color || caret.height != size + 2)
 		{
@@ -310,7 +310,7 @@ class FlxInputText extends FlxText
 		}
 
 		drawSprite(caret);
-		
+
 		#if FLX_DEBUG
 		if (FlxG.debugger.drawDebug)
 			drawDebug();
@@ -367,6 +367,9 @@ class FlxInputText extends FlxText
 	{
 		final key:FlxKey = e.keyCode;
 
+		// Update caps lock state when caps lock key is pressed
+		updateCapsLockState(e.keyCode);
+
 		if (hasFocus)
 		{
 			switch (key)
@@ -421,7 +424,28 @@ class FlxInputText extends FlxText
 					{
 						return;
 					}
-					final newText = filter(String.fromCharCode(e.charCode));
+
+					var inputChar = String.fromCharCode(e.charCode);
+
+					// Handle special characters with Shift + number keys
+					if (e.shiftKey)
+					{
+						inputChar = getShiftSpecialChar(e.keyCode, inputChar);
+					}
+					// Handle Caps Lock for letter case
+					else if (isCapsLockOn())
+					{
+						if (inputChar >= 'a' && inputChar <= 'z')
+						{
+							inputChar = inputChar.toUpperCase();
+						}
+						else if (inputChar >= 'A' && inputChar <= 'Z')
+						{
+							inputChar = inputChar.toLowerCase();
+						}
+					}
+
+					final newText = filter(inputChar);
 
 					if (newText.length > 0 && (maxLength == 0 || (text.length + newText.length) <= maxLength))
 					{
@@ -477,6 +501,77 @@ class FlxInputText extends FlxText
 			Original = Original + (Insert);
 		}
 		return Original;
+	}
+
+	/**
+	 * Checks if Caps Lock is currently on
+	 * @return True if Caps Lock is on, false otherwise
+	 */
+	private function isCapsLockOn():Bool
+	{
+		#if flash
+		return flash.ui.Keyboard.capsLock;
+		#elseif js
+		// For HTML5, we detect caps lock state through a static variable
+		// This needs to be updated when caps lock key is pressed
+		return _capsLockState;
+		#else
+		// For other platforms, we'll use a simple detection method
+		return _capsLockState;
+		#end
+	}
+
+	/**
+	 * Gets special character for Shift + number key combinations
+	 * @param keyCode The key code of the pressed key
+	 * @param originalChar The original character
+	 * @return The special character or original if no mapping exists
+	 */
+	private function getShiftSpecialChar(keyCode:Int, originalChar:String):String
+	{
+		// Map of number keys to their shift special characters
+		switch (keyCode)
+		{
+			case 49:
+				return "!"; // 1 -> !
+			case 50:
+				return "@"; // 2 -> @
+			case 51:
+				return "#"; // 3 -> #
+			case 52:
+				return "$"; // 4 -> $
+			case 53:
+				return "%"; // 5 -> %
+			case 54:
+				return "^"; // 6 -> ^
+			case 55:
+				return "&"; // 7 -> &
+			case 56:
+				return "*"; // 8 -> *
+			case 57:
+				return "("; // 9 -> (
+			case 48:
+				return ")"; // 0 -> )
+			default:
+				return originalChar;
+		}
+	}
+
+	/**
+	 * Static variable to track caps lock state across platforms
+	 */
+	private static var _capsLockState:Bool = false;
+
+	/**
+	 * Updates the caps lock state when caps lock key is detected
+	 */
+	private function updateCapsLockState(keyCode:Int):Void
+	{
+		// Caps Lock key code is 20
+		if (keyCode == 20)
+		{
+			_capsLockState = !_capsLockState;
+		}
 	}
 
 	/**
@@ -733,7 +828,7 @@ class FlxInputText extends FlxText
 					// No border, just make the caret
 					caret.makeGraphic(cw, ch, caretC, false, caretKey);
 					caret.offset.x = caret.offset.y = 0;
-					
+
 				case SHADOW:
 					// Shadow offset to the lower-right
 					final absSize = Math.abs(borderSize);
