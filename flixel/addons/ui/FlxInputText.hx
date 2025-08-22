@@ -448,10 +448,6 @@ class FlxInputText extends FlxText
 						{
 							inputChar = inputChar.toUpperCase();
 						}
-						else
-						{
-							inputChar = inputChar.toLowerCase();
-						}
 					}
 					// Handle special characters with Shift + keys
 					else if (isShiftPressed)
