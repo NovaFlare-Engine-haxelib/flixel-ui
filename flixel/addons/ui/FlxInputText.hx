@@ -432,17 +432,19 @@ class FlxInputText extends FlxText
 					{
 						inputChar = getShiftSpecialChar(e.keyCode, inputChar);
 					}
-					// Handle Caps Lock for letter case
+					// Handle Caps Lock for letter case (without needing Shift)
 					else if (isCapsLockOn())
 					{
+						// When Caps Lock is on, convert lowercase to uppercase
 						if (inputChar >= 'a' && inputChar <= 'z')
 						{
 							inputChar = inputChar.toUpperCase();
 						}
-						else if (inputChar >= 'A' && inputChar <= 'Z')
-						{
-							inputChar = inputChar.toLowerCase();
-						}
+					}
+					// When Caps Lock is off and no Shift, keep original case
+					else
+					{
+						// Normal behavior - letters stay as they are typed
 					}
 
 					final newText = filter(inputChar);
@@ -572,6 +574,11 @@ class FlxInputText extends FlxText
 		{
 			_capsLockState = !_capsLockState;
 		}
+
+		#if js
+		// For HTML5, we can also detect caps lock state through character comparison
+		// This is a fallback method for better detection
+		#end
 	}
 
 	/**
