@@ -189,6 +189,11 @@ class FlxInputText extends FlxText
 	private var lastScroll:Int;
 
 	/**
+	 * variable to track caps lock state across platforms
+	 */
+	public var capsLockEnabled:Bool = false;
+
+	/**
 	 * @param	X				The X position of the text.
 	 * @param	Y				The Y position of the text.
 	 * @param	Width			The width of the text object (height is determined automatically).
@@ -225,7 +230,7 @@ class FlxInputText extends FlxText
 		}
 
 		lines = 1;
-		FlxG.stage.addEventListener(KeyboardEvent.KEY_DOWN, onKeyDown, false, 1);
+		FlxG.stage.addEventListener(KeyboardEvent.KEY_DOWN, onKeyDown);
 
 		if (Text == null)
 		{
@@ -367,8 +372,15 @@ class FlxInputText extends FlxText
 	{
 		final key:FlxKey = e.keyCode;
 
-		// Update caps lock state when caps lock key is pressed
-		updateCapsLockState(e.keyCode);
+		var keyCode:Int = e.keyCode;
+		var flxKey:FlxKey = cast keyCode;
+
+		// Handle Caps Lock key toggle
+		if (flxKey == CAPSLOCK)
+		{
+			capsLockEnabled = !capsLockEnabled;
+			return;
+		}
 
 		if (hasFocus)
 		{
@@ -425,26 +437,49 @@ class FlxInputText extends FlxText
 						return;
 					}
 
-					var inputChar = String.fromCharCode(e.charCode);
+					var charCode = e.charCode;
+					var inputChar = String.fromCharCode(charCode);
+					var isShiftPressed:Bool = e.shiftKey;
 
-					// Handle special characters with Shift + number keys
-					if (e.shiftKey)
+					// Handle letter case with Caps Lock (like PsychUIInputText)
+					if ((charCode >= 97 && charCode <= 122) || (charCode >= 65 && charCode <= 90))
 					{
-						inputChar = getShiftSpecialChar(e.keyCode, inputChar);
-					}
-					// Handle Caps Lock for letter case (without needing Shift)
-					else if (isCapsLockOn())
-					{
-						// When Caps Lock is on, convert lowercase to uppercase
-						if (inputChar >= 'a' && inputChar <= 'z')
+						if (capsLockEnabled)
 						{
 							inputChar = inputChar.toUpperCase();
 						}
+						else
+						{
+							inputChar = inputChar.toLowerCase();
+						}
 					}
-					// When Caps Lock is off and no Shift, keep original case
-					else
+					// Handle special characters with Shift + keys
+					else if (isShiftPressed)
 					{
-						// Normal behavior - letters stay as they are typed
+						switch (charCode)
+						{
+							case 49: inputChar = "!"; // 1 -> !
+							case 50: inputChar = "@"; // 2 -> @
+							case 51: inputChar = "#"; // 3 -> #
+							case 52: inputChar = "$"; // 4 -> $
+							case 53: inputChar = "%"; // 5 -> %
+							case 54: inputChar = "^"; // 6 -> ^
+							case 55: inputChar = "&"; // 7 -> &
+							case 56: inputChar = "*"; // 8 -> *
+							case 57: inputChar = "("; // 9 -> (
+							case 48: inputChar = ")"; // 0 -> )
+							case 45: inputChar = "_"; // - -> _
+							case 61: inputChar = "+"; // = -> +
+							case 91: inputChar = "{"; // [ -> {
+							case 93: inputChar = "}"; // ] -> }
+							case 92: inputChar = "|"; // \ -> |
+							case 59: inputChar = ":"; // ; -> :
+							case 39: inputChar = "\""; // ' -> "
+							case 44: inputChar = "<"; // , -> <
+							case 46: inputChar = ">"; // . -> >
+							case 47: inputChar = "?"; // / -> ?
+							case 96: inputChar = "~"; // ` -> ~
+						}
 					}
 
 					final newText = filter(inputChar);
@@ -503,82 +538,6 @@ class FlxInputText extends FlxText
 			Original = Original + (Insert);
 		}
 		return Original;
-	}
-
-	/**
-	 * Checks if Caps Lock is currently on
-	 * @return True if Caps Lock is on, false otherwise
-	 */
-	private function isCapsLockOn():Bool
-	{
-		#if flash
-		return flash.ui.Keyboard.capsLock;
-		#elseif js
-		// For HTML5, we detect caps lock state through a static variable
-		// This needs to be updated when caps lock key is pressed
-		return _capsLockState;
-		#else
-		// For other platforms, we'll use a simple detection method
-		return _capsLockState;
-		#end
-	}
-
-	/**
-	 * Gets special character for Shift + number key combinations
-	 * @param keyCode The key code of the pressed key
-	 * @param originalChar The original character
-	 * @return The special character or original if no mapping exists
-	 */
-	private function getShiftSpecialChar(keyCode:Int, originalChar:String):String
-	{
-		// Map of number keys to their shift special characters
-		switch (keyCode)
-		{
-			case 49:
-				return "!"; // 1 -> !
-			case 50:
-				return "@"; // 2 -> @
-			case 51:
-				return "#"; // 3 -> #
-			case 52:
-				return "$"; // 4 -> $
-			case 53:
-				return "%"; // 5 -> %
-			case 54:
-				return "^"; // 6 -> ^
-			case 55:
-				return "&"; // 7 -> &
-			case 56:
-				return "*"; // 8 -> *
-			case 57:
-				return "("; // 9 -> (
-			case 48:
-				return ")"; // 0 -> )
-			default:
-				return originalChar;
-		}
-	}
-
-	/**
-	 * Static variable to track caps lock state across platforms
-	 */
-	private static var _capsLockState:Bool = false;
-
-	/**
-	 * Updates the caps lock state when caps lock key is detected
-	 */
-	private function updateCapsLockState(keyCode:Int):Void
-	{
-		// Caps Lock key code is 20
-		if (keyCode == 20)
-		{
-			_capsLockState = !_capsLockState;
-		}
-
-		#if js
-		// For HTML5, we can also detect caps lock state through character comparison
-		// This is a fallback method for better detection
-		#end
 	}
 
 	/**
