@@ -23,7 +23,7 @@ class FlxUIMouse extends FlxMouse
 	 * Called by the internal game loop to update the mouse pointer's position in the game world.
 	 * Also updates the just pressed/just released flags.
 	 */
-	override function update():Void
+	override function handleInput():Void
 	{
 		#if (flixel < version("5.9.0"))
 		final oldScreenX = _globalScreenX;
@@ -33,7 +33,7 @@ class FlxUIMouse extends FlxMouse
 		final oldRawY = _rawY;
 		#end
 		
-		super.update();
+		super.handleInput();
 
 		if (!updateGlobalScreenPosition)
 		{

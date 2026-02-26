@@ -291,9 +291,9 @@ class FlxUITypedButton<T:FlxSprite> extends FlxTypedButton<T> implements IFlxUIB
 		}
 	}
 
-	public override function update(elapsed:Float):Void
+	public override function handleInput(elapsed:Float):Void
 	{
-		super.update(elapsed);
+		super.handleInput(elapsed);
 
 		if (status == NORMAL && mouseIsOver && input.justReleased == false)
 		{
@@ -303,7 +303,7 @@ class FlxUITypedButton<T:FlxSprite> extends FlxTypedButton<T> implements IFlxUIB
 			inputOver.release();
 		}
 
-		inputOver.update();
+		inputOver.handleInput();
 
 		// Label positioning
 		if (label != null)

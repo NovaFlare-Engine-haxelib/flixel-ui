@@ -1,7 +1,6 @@
 package flixel.addons.ui;
 
 import openfl.display.BitmapData;
-import openfl.display.BlendMode;
 import openfl.geom.Point;
 import flixel.addons.ui.FlxUI.MaxMinSize;
 import flixel.FlxBasic;
@@ -22,6 +21,7 @@ import openfl.display.BitmapDataChannel;
 import openfl.geom.Matrix;
 import flixel.system.FlxAssets.FlxGraphicAsset;
 import openfl.geom.Rectangle;
+import openfl.display.BlendMode;
 #if sys
 import sys.FileSystem;
 import sys.io.File;
