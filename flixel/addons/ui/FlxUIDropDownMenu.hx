@@ -11,7 +11,9 @@ import flixel.ui.FlxButton;
 import flixel.util.FlxColor;
 import flixel.util.FlxDestroyUtil;
 import flixel.util.FlxStringUtil;
-
+#if FLX_TOUCH
+import flixel.input.touch.FlxTouch;
+#end
 #if (flixel < version("5.7.0"))
 import flixel.ui.FlxButton.NORMAL;
 import flixel.ui.FlxButton.HIGHLIGHT;
@@ -22,6 +24,7 @@ import flixel.ui.FlxButton.FlxButtonState.HIGHLIGHT;
 import flixel.ui.FlxButton.FlxButtonState.PRESSED;
 import flixel.ui.FlxButton.FlxButtonState.DISABLED;
 #end
+
 /**
  * @author larsiusprime
  */
@@ -129,9 +132,20 @@ class FlxUIDropDownMenu extends FlxUIGroup implements IFlxUIWidget implements IF
 	private function set_dropDirection(dropDirection):FlxUIDropDownMenuDropDirection
 	{
 		this.dropDirection = dropDirection;
-		updateButtonPositions();
+		if (dropPanel != null && dropPanel.visible)
+			refreshListView();
+		else
+			updateButtonPositions();
 		return dropDirection;
 	}
+
+	public var maxVisibleItems:Int = 0;
+	public var curScroll:Int = 0;
+
+	#if FLX_TOUCH
+	var _touchLastY:Map<Int, Float> = [];
+	var _touchAccumY:Map<Int, Float> = [];
+	#end
 
 	public static inline var CLICK_EVENT:String = "click_dropdown";
 
@@ -167,6 +181,7 @@ class FlxUIDropDownMenu extends FlxUIGroup implements IFlxUIWidget implements IF
 			var rect = new Rectangle(0, 0, header.background.width, header.background.height);
 			dropPanel = new FlxUI9SliceSprite(0, 0, FlxUIAssets.IMG_BOX, rect, [1, 1, 14, 14]);
 		}
+		dropPanel.visible = false;
 
 		if (DataList != null)
 		{
@@ -196,6 +211,7 @@ class FlxUIDropDownMenu extends FlxUIGroup implements IFlxUIWidget implements IF
 		{
 			add(btn);
 			btn.visible = false;
+			btn.active = false;
 		}
 
 		// _ui_control_callback = UIControlCallback;
@@ -212,11 +228,19 @@ class FlxUIDropDownMenu extends FlxUIGroup implements IFlxUIWidget implements IF
 		else
 			dropPanel.y += buttonHeight;
 
-		var offset = dropPanel.y;
-		for (button in list)
+		var visibleCount = getVisibleItemCount();
+		for (i in 0...list.length)
 		{
-			button.y = offset;
-			offset += buttonHeight;
+			var button = list[i];
+			if (button == null)
+				continue;
+
+			var rel = i - curScroll;
+			var vis = dropPanel.visible && rel >= 0 && rel < visibleCount;
+			button.visible = vis;
+			button.active = vis;
+			if (vis)
+				button.y = dropPanel.y + (rel * buttonHeight);
 		}
 	}
 
@@ -249,7 +273,22 @@ class FlxUIDropDownMenu extends FlxUIGroup implements IFlxUIWidget implements IF
 
 	private function dropsUp():Bool
 	{
-		return dropDirection == Up || (dropDirection == Automatic && exceedsHeight());
+		if (dropDirection == Up)
+			return true;
+		if (dropDirection == Down)
+			return false;
+
+		var buttonHeight = header.background.height;
+		var totalHeight = list.length * buttonHeight;
+		var availDown = FlxG.height - (y + header.background.height);
+		if (totalHeight <= availDown)
+			return false;
+
+		var availUp = y;
+		if (totalHeight <= availUp)
+			return true;
+
+		return availUp > availDown;
 	}
 
 	private function exceedsHeight():Bool
@@ -259,7 +298,46 @@ class FlxUIDropDownMenu extends FlxUIGroup implements IFlxUIWidget implements IF
 
 	private function getPanelHeight():Float
 	{
-		return list.length * header.background.height;
+		return getVisibleItemCount() * header.background.height;
+	}
+
+	private function getVisibleItemCount():Int
+	{
+		if (list == null || list.length <= 0)
+			return 0;
+
+		var max = maxVisibleItems;
+		if (max <= 0)
+		{
+			var buttonHeight = header.background.height;
+			var avail = dropsUp() ? y : (FlxG.height - (y + header.background.height));
+			max = Std.int(Math.floor(avail / buttonHeight));
+			if (max < 1)
+				max = 1;
+		}
+
+		return Std.int(Math.min(list.length, max));
+	}
+
+	private function clampScroll(scroll:Int):Int
+	{
+		var visibleCount = getVisibleItemCount();
+		var maxScroll = Std.int(Math.max(0, list.length - visibleCount));
+		return Std.int(Math.max(0, Math.min(maxScroll, scroll)));
+	}
+
+	private function setScroll(scroll:Int):Void
+	{
+		curScroll = clampScroll(scroll);
+		if (dropPanel.visible)
+			refreshListView();
+	}
+
+	private function refreshListView():Void
+	{
+		curScroll = clampScroll(curScroll);
+		dropPanel.resize(header.background.width, getPanelHeight());
+		updateButtonPositions();
 	}
 
 	/**
@@ -405,30 +483,140 @@ class FlxUIDropDownMenu extends FlxUIGroup implements IFlxUIWidget implements IF
 	public override function update(elapsed:Float):Void
 	{
 		super.update(elapsed);
-		
+
+		if (dropPanel.visible)
+		{
+			var wheel:Int = FlxG.mouse.wheel;
+			if (FlxG.keys.justPressed.UP)
+				wheel++;
+			if (FlxG.keys.justPressed.DOWN)
+				wheel--;
+			if (wheel != 0)
+				setScroll(curScroll - wheel);
+		}
+
 		#if FLX_MOUSE
-		checkClickOff();
+		checkClickOffMouse();
+		#end
+
+		#if FLX_TOUCH
+		if (dropPanel.visible)
+			handleTouchScroll();
+		checkClickOffTouch();
 		#end
 	}
-	
+
+	#if FLX_TOUCH
+	function handleTouchScroll():Void
+	{
+		for (touch in FlxG.touches.list)
+		{
+			var id = touch.touchPointID;
+			if (touch.justPressed)
+			{
+				_touchLastY.set(id, touch.y);
+				_touchAccumY.set(id, 0);
+				continue;
+			}
+
+			if (touch.pressed)
+			{
+				var lastY = _touchLastY.get(id);
+				if (lastY == null)
+				{
+					_touchLastY.set(id, touch.y);
+					_touchAccumY.set(id, 0);
+					continue;
+				}
+
+				var accum = _touchAccumY.get(id);
+				if (accum == null)
+					accum = 0;
+
+				var dy = touch.y - lastY;
+				accum += dy;
+				_touchLastY.set(id, touch.y);
+
+				while (accum >= 10)
+				{
+					setScroll(curScroll - 1);
+					accum -= 10;
+				}
+				while (accum <= -10)
+				{
+					setScroll(curScroll + 1);
+					accum += 10;
+				}
+
+				_touchAccumY.set(id, accum);
+			}
+
+			if (touch.justReleased)
+			{
+				_touchLastY.remove(id);
+				_touchAccumY.remove(id);
+			}
+		}
+	}
+	#end
+
 	#if FLX_MOUSE
-	function checkClickOff()
+	function checkClickOffMouse()
 	{
 		if (dropPanel.visible && FlxG.mouse.justPressed)
 		{
+			updateClickTargetsForJustPressed();
 			if (header.button.justPressed)
 				return;
-			
+
 			for (button in list)
 			{
 				if (button.justPressed)
 					return;
 			}
-			
+
 			showList(false);
 		}
 	}
 	#end
+
+	#if FLX_TOUCH
+	function checkClickOffTouch()
+	{
+		if (!dropPanel.visible)
+			return;
+
+		for (touch in FlxG.touches.list)
+		{
+			if (!touch.justPressed)
+				continue;
+
+			updateClickTargetsForJustPressed();
+
+			if (touch.overlaps(header.button, camera))
+				return;
+
+			for (button in list)
+			{
+				if (button != null && button.visible && button.active && touch.overlaps(button, camera))
+					return;
+			}
+
+			showList(false);
+			return;
+		}
+	}
+	#end
+
+	function updateClickTargetsForJustPressed():Void
+	{
+		header.update(0);
+		for (button in list)
+		{
+			if (button != null && button.visible && button.active)
+				button.update(0);
+		}
+	}
 
 	override public function destroy():Void
 	{
@@ -443,13 +631,22 @@ class FlxUIDropDownMenu extends FlxUIGroup implements IFlxUIWidget implements IF
 
 	private function showList(b:Bool):Void
 	{
-		for (button in list)
-		{
-			button.visible = b;
-			button.active = b;
-		}
-
 		dropPanel.visible = b;
+		if (b)
+		{
+			refreshListView();
+		}
+		else
+		{
+			for (button in list)
+			{
+				if (button != null)
+				{
+					button.visible = false;
+					button.active = false;
+				}
+			}
+		}
 
 		FlxUI.forceFocus(b, this); // avoid overlaps
 	}
