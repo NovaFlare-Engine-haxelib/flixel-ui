@@ -491,6 +491,9 @@ class FlxUIDropDownMenu extends FlxUIGroup implements IFlxUIWidget implements IF
 				wheel++;
 			if (FlxG.keys.justPressed.DOWN)
 				wheel--;
+			#if FLX_TOUCH
+			handleTouchScroll();
+			#end
 			if (wheel != 0)
 				setScroll(curScroll - wheel);
 		}
@@ -498,10 +501,7 @@ class FlxUIDropDownMenu extends FlxUIGroup implements IFlxUIWidget implements IF
 		#if FLX_MOUSE
 		checkClickOffMouse();
 		#end
-
 		#if FLX_TOUCH
-		if (dropPanel.visible)
-			handleTouchScroll();
 		checkClickOffTouch();
 		#end
 	}
