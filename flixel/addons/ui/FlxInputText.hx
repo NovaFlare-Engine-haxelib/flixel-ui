@@ -1,6 +1,7 @@
 package flixel.addons.ui;
 
 import flixel.FlxG;
+import flixel.input.FlxPointer;
 import flixel.FlxSprite;
 import flixel.addons.ui.FlxUI.NamedString;
 import flixel.input.keyboard.FlxKey;
@@ -30,6 +31,9 @@ import openfl.geom.Rectangle;
  */
 class FlxInputText extends FlxText
 {
+	static var _lastFocusFrame:Int = -1;
+	static var _justGainedAny:Bool = false;
+
 	public static inline var NO_FILTER:Int = 0;
 	public static inline var ONLY_ALPHA:Int = 1;
 	public static inline var ONLY_NUMERIC:Int = 2;
@@ -343,26 +347,35 @@ class FlxInputText extends FlxText
 	{
 		super.update(elapsed);
 
+		var f = FlxG.game.ticks;
+		if (f != _lastFocusFrame) { _lastFocusFrame = f; _justGainedAny = false; }
+
 		#if FLX_MOUSE
-		// Set focus and caretIndex as a response to mouse press
-		if (FlxG.mouse.justPressed)
+		if (FlxG.mouse.justPressed) handlePress(FlxG.mouse);
+		#end
+		#if FLX_TOUCH
+		for (touch in FlxG.touches.list)
 		{
-			var hadFocus:Bool = hasFocus;
-			if (FlxG.mouse.overlaps(this))
-			{
-				caretIndex = getCaretIndex();
-				hasFocus = true;
-				if (!hadFocus && focusGained != null)
-					focusGained();
-			}
-			else
-			{
-				hasFocus = false;
-				if (hadFocus && focusLost != null)
-					focusLost();
-			}
+			if (touch.justPressed) { handlePress(touch); break; }
 		}
 		#end
+	}
+
+	function handlePress(pointer:FlxPointer):Void
+	{
+		var hadFocus:Bool = hasFocus;
+		if (pointer.overlaps(this))
+		{
+			caretIndex = getCaretIndex();
+			hasFocus = true;
+			_justGainedAny = true;
+			if (!hadFocus && focusGained != null) focusGained();
+		}
+		else if (!_justGainedAny)
+		{
+			hasFocus = false;
+			if (hadFocus && focusLost != null) focusLost();
+		}
 	}
 
 	/**
@@ -944,7 +957,7 @@ class FlxInputText extends FlxText
 
 			#if mobile
 			// Remove soft keyboard
-			FlxG.stage.window.textInputEnabled = false;
+				FlxG.stage.window.textInputEnabled = false;
 			#end
 		}
 
